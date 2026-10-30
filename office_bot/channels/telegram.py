@@ -51,6 +51,14 @@ def connect():
 	return url
 
 
+@frappe.whitelist(methods=["GET"])
+def connection_status():
+	"""Where the bot sends its messages now, so Connect Telegram can warn before moving it."""
+	frappe.only_for("System Manager")
+	url = telegram_api.call("getWebhookInfo").get("url") or ""
+	return {"url": url, "this_site": url == get_url(WEBHOOK_PATH)}
+
+
 def handle(chat_key: str, text: str, tap: dict | None = None):
 	if tap:
 		telegram_api.show_picked(chat_key.partition(":")[0], tap["message_id"], tap["label"])

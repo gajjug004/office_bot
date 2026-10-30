@@ -1,10 +1,14 @@
+import traceback
 from itertools import count
 from unittest.mock import patch
 
 import frappe
+import requests
 from frappe.tests import IntegrationTestCase
 
 from office_bot.channels import telegram
+from office_bot.channels.telegram_api import TelegramError
+from office_bot.channels.telegram_api import call as real_call
 from office_bot.command import Reply
 from office_bot.conversation import STATE_DOCTYPE
 from office_bot.tests import test_conversation  # registers /test_order
@@ -124,6 +128,21 @@ class TestTelegram(IntegrationTestCase):
 	def test_unlisted_group_is_told_its_id(self):
 		self.assertFalse(self.text(-999, "/test_order").called)
 		self.assertIn("<code>-999</code>", self.sent()[-1]["text"])
+
+	def test_unreachable_telegram_error_does_not_carry_the_token(self):
+		frappe.get_single("Office Bot Settings").update({"telegram_bot_token": "123:SECRET"}).save()
+		leak = requests.ConnectionError("https://api.telegram.org/bot123:SECRET/getMe")
+		with patch("office_bot.channels.telegram_api.requests.post", side_effect=leak):
+			with self.assertRaises(TelegramError) as raised:
+				real_call("getMe")
+		self.assertIsNone(raised.exception.__context__)
+		self.assertNotIn("SECRET", "".join(traceback.format_exception(raised.exception)))
+
+	def test_connection_status(self):
+		ours = frappe.utils.get_url(telegram.WEBHOOK_PATH)
+		for url, expected in (("", False), ("https://other.example.com/hook", False), (ours, True)):
+			with patch("office_bot.channels.telegram_api.call", return_value={"url": url}):
+				self.assertEqual(telegram.connection_status(), {"url": url, "this_site": expected})
 
 	def test_render_link_and_numbered_multiple_choice(self):
 		text, markup = telegram.render(

@@ -16,17 +16,27 @@ class TelegramError(frappe.ValidationError):
 def call(method, **payload):
 	token = frappe.get_single("Office Bot Settings").get_password("telegram_bot_token", raise_exception=False)
 	if not token:
-		raise TelegramError(_("Set the Telegram bot token in Office Bot Settings."))
+		frappe.throw(
+			_("Set the Telegram bot token in Office Bot Settings."), TelegramError, title=_("Telegram")
+		)
 
 	try:
 		response = requests.post(API_URL.format(token=token, method=method), json=payload, timeout=TIMEOUT)
 		body = response.json()
 	except requests.RequestException, ValueError:
-		# The exception text holds the URL, and the URL holds the token. Do not chain or log it.
-		raise TelegramError(_("Could not reach Telegram for {0}.").format(method)) from None
+		body = None
+	# Throw outside the except block: the requests error holds the URL, and the URL holds the token.
+	if body is None:
+		frappe.throw(
+			_("Could not reach Telegram for {0}.").format(method), TelegramError, title=_("Telegram")
+		)
 
 	if not body.get("ok"):
-		raise TelegramError(_("Telegram {0} failed: {1}").format(method, body.get("description")))
+		frappe.throw(
+			_("Telegram {0} failed: {1}").format(method, body.get("description")),
+			TelegramError,
+			title=_("Telegram"),
+		)
 	return body["result"]
 
 
