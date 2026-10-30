@@ -1,6 +1,6 @@
 ### Office Bot
 
-Apply for work from home, leave and petty cash from chat. Works in [Raven](https://github.com/frappe/raven) today. The commands do not depend on the chat app, so other channels such as Telegram can plug in later.
+Apply for work from home, leave and petty cash from chat, in [Raven](https://github.com/frappe/raven) and Telegram. The commands do not depend on the chat app, so both work the same way and more channels can plug in later.
 
 ### Commands
 
@@ -31,6 +31,15 @@ Dates can be `today`, `tomorrow`, `fri`, `next mon`, `5 nov` or `05-11-2026`. Ty
 
 Commands run as the person who sent the message, with their own permissions. Two steps go further on purpose: submitting a WFH request, and withdrawing your own upcoming request. HRMS does not let the Employee role do those.
 
+### How it works in Telegram
+
+- Choices are buttons. A tapped question shows the answer it got. Taps on an older question, or on someone else's question, are refused.
+- In a direct message, just type your answers.
+- In a group, questions stay in the group, because a bot cannot message someone who never opened a chat with it. Answers you type must be replies to the bot's question. Telegram opens the reply box for you.
+- The bot only reads commands and replies to its own messages in groups, not normal chatter.
+- Results link to the record in the desk.
+- Leave approvers and employees get the same messages as in Raven, if they have opened a chat with the bot. The daily lists go to every listed group.
+
 ### Setup
 
 ```bash
@@ -52,6 +61,13 @@ Then open **Office Bot Settings** and set:
 - **Hive Sites**, if you use `/task`.
 
 Add the bot to the Raven channels where people should use it.
+
+For Telegram:
+
+1. Create a bot with [@BotFather](https://t.me/BotFather) and paste its token into **Bot Token** in Office Bot Settings.
+2. Click **Connect Telegram**. The site must be reachable over HTTPS. This points Telegram at the site and fills the bot's command menu.
+3. Add each person under **Telegram Users** with their username. Their ID is saved the first time they write. People the bot does not know are told their ID when they send a command.
+4. Add the bot to your groups and send any command. The bot replies with the group's chat ID. Add it under **Telegram Groups**.
 
 ### Tests
 

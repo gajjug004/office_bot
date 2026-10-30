@@ -1,14 +1,11 @@
-import re
-
 import frappe
 from frappe.utils import escape_html, get_url
 
+from office_bot.channels.markup import to_html
+from office_bot.command import hint_sentence
 from office_bot.conversation import Conversation
 
 CHANNEL = "Raven"
-BOLD = re.compile(r"\*\*(.+?)\*\*")
-# Only http(s) links, so text a user typed cannot become a javascript: link.
-LINK = re.compile(r"\[([^\]]+)\]\((https?://[^)\s]+)\)")
 
 
 def on_message(doc, method=None):
@@ -103,16 +100,9 @@ def is_command_for_bot(bot, message):
 
 
 def render_html(reply):
-	html = [f"<p>{format_inline(line)}</p>" for line in reply.text.split("\n") if line.strip()]
+	html = [f"<p>{to_html(line)}</p>" for line in reply.text.split("\n") if line.strip()]
 	if reply.choices:
-		html.append(
-			"<ol>" + "".join(f"<li>{format_inline(choice)}</li>" for choice in reply.choices) + "</ol>"
-		)
-	if reply.hint:
-		html.append(f"<p><em>{escape_html(reply.hint)}</em></p>")
+		html.append("<ol>" + "".join(f"<li>{to_html(choice)}</li>" for choice in reply.choices) + "</ol>")
+	if hint := hint_sentence(reply, numbered=True):
+		html.append(f"<p><em>{escape_html(hint)}</em></p>")
 	return "".join(html)
-
-
-def format_inline(text):
-	text = BOLD.sub(r"<strong>\1</strong>", escape_html(text))
-	return LINK.sub(r'<a href="\2">\1</a>', text)

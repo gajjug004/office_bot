@@ -24,8 +24,10 @@ class Reply:
 
 	text: str
 	choices: list[str] = field(default_factory=list)
-	hint: str = ""
+	hint: str = ""  # other ways to answer, like "type a date"
 	link: tuple[str, str] | None = None
+	asks: bool = False
+	multiple: bool = False
 
 
 @dataclass
@@ -53,20 +55,23 @@ class Field:
 		return self.choices(values, context) if self.choices else []
 
 	def prompt(self, values, context):
-		choices = self.get_choices(values, context)
-		return Reply(_(self.question), choices=[choice.label for choice in choices], hint=self.hint(choices))
+		return Reply(
+			_(self.question),
+			choices=[choice.label for choice in self.get_choices(values, context)],
+			hint=self.hint(),
+			asks=True,
+			multiple=self.kind == "multichoice",
+		)
 
-	def hint(self, choices):
+	def hint(self):
 		parts = []
-		if choices:
-			parts.append(_("Reply with a number"))
 		if self.kind == "date":
-			parts.append(_("or type a date like tomorrow, fri or 5 nov") if choices else _("Type a date"))
+			parts.append(_("type a date like tomorrow, fri or 5 nov"))
 		if self.kind == "multichoice":
-			parts.append(_("Pick several like 1,3"))
+			parts.append(_("pick several like 1,3"))
 		if self.optional:
-			parts.append(_("or skip"))
-		return ", ".join(parts) + "." if parts else ""
+			parts.append(_("type skip to leave it out"))
+		return ", ".join(parts)
 
 	def read(self, text, values, context) -> dict:
 		"""Turn an answer into field values. Throws a ValidationError the user can read."""
@@ -137,6 +142,15 @@ class Command:
 
 	def get_field(self, key):
 		return next(field for field in self.fields if field.key == key)
+
+
+def hint_sentence(reply, numbered):
+	"""The hint as a sentence. `numbered` adds "reply with a number" for channels that list choices as text."""
+	parts = [_("reply with a number")] if numbered and reply.choices else []
+	if reply.hint:
+		parts.append(reply.hint)
+	sentence = _(", or ").join(parts)
+	return f"{sentence[:1].upper()}{sentence[1:]}." if sentence else ""
 
 
 def pick_choice(text, choices):

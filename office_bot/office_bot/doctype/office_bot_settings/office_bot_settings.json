@@ -12,7 +12,16 @@
   "column_break_1",
   "default_cash_account",
   "hive_section",
-  "hive_sites"
+  "hive_sites",
+  "telegram_section",
+  "telegram_bot_token",
+  "telegram_bot_username",
+  "column_break_telegram",
+  "connect_telegram",
+  "telegram_webhook_secret",
+  "telegram_lists_section",
+  "telegram_chats",
+  "telegram_users"
  ],
  "fields": [
   {
@@ -54,13 +63,64 @@
    "fieldtype": "Table",
    "label": "Hive Sites",
    "options": "Office Bot Hive Site"
+  },
+  {
+   "fieldname": "telegram_section",
+   "fieldtype": "Section Break",
+   "label": "Telegram"
+  },
+  {
+   "description": "From @BotFather",
+   "fieldname": "telegram_bot_token",
+   "fieldtype": "Password",
+   "label": "Bot Token"
+  },
+  {
+   "fieldname": "telegram_bot_username",
+   "fieldtype": "Data",
+   "label": "Bot Username",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_telegram",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Points Telegram at this site and sets the bot's command menu",
+   "fieldname": "connect_telegram",
+   "fieldtype": "Button",
+   "label": "Connect Telegram"
+  },
+  {
+   "fieldname": "telegram_webhook_secret",
+   "fieldtype": "Password",
+   "hidden": 1,
+   "label": "Webhook Secret",
+   "read_only": 1
+  },
+  {
+   "fieldname": "telegram_lists_section",
+   "fieldtype": "Section Break"
+  },
+  {
+   "description": "Groups where the bot takes commands and posts the daily leave and WFH list",
+   "fieldname": "telegram_chats",
+   "fieldtype": "Table",
+   "label": "Telegram Groups",
+   "options": "Office Bot Telegram Chat"
+  },
+  {
+   "fieldname": "telegram_users",
+   "fieldtype": "Table",
+   "label": "Telegram Users",
+   "options": "Office Bot Telegram User"
   }
  ],
  "grid_page_length": 50,
  "issingle": 1,
  "link_display_mode": "Search",
  "links": [],
- "modified": "2026-10-30 10:46:05.832698",
+ "modified": "2026-10-30 11:58:07.777567",
  "modified_by": "Administrator",
  "module": "Office Bot",
  "name": "Office Bot Settings",

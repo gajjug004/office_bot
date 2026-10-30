@@ -1,0 +1,52 @@
+{
+ "actions": [],
+ "allow_bulk_edit": 1,
+ "allow_rename": 1,
+ "creation": "2026-10-30 11:58:07.092342",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "user",
+  "telegram_user_id",
+  "telegram_username"
+ ],
+ "fields": [
+  {
+   "fieldname": "user",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "User",
+   "options": "User",
+   "reqd": 1
+  },
+  {
+   "description": "The bot tells people their ID when they send it a command",
+   "fieldname": "telegram_user_id",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Telegram User ID"
+  },
+  {
+   "fieldname": "telegram_username",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Telegram Username"
+  }
+ ],
+ "grid_page_length": 50,
+ "istable": 1,
+ "link_display_mode": "Search",
+ "links": [],
+ "modified": "2026-10-30 11:58:07.092342",
+ "modified_by": "Administrator",
+ "module": "Office Bot",
+ "name": "Office Bot Telegram User",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

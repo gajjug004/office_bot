@@ -1,3 +1,4 @@
+import difflib
 import json
 
 import frappe
@@ -16,7 +17,7 @@ class Conversation:
 	"""Runs commands for one user in one chat. The chat is a channel adapter, see channels/raven.py.
 
 	A chat needs: `channel`, `chat_id`, `user`, `is_private`, `url` (or None), `send(reply)`,
-	`private_chat()` for the user's DM with the bot, and `other_chat(chat_id)`.
+	`private_chat()` for where to ask follow-up questions, and `other_chat(chat_id)`.
 	"""
 
 	def __init__(self, chat):
@@ -35,9 +36,7 @@ class Conversation:
 		name, _separator, args = text.partition(" ")
 		command = COMMANDS.get(name.lower())
 		if not command:
-			self.chat.send(
-				Reply(_("I don't know **/{0}**. Type **/help** to see the commands.").format(name))
-			)
+			self.chat.send(Reply(unknown_command_text(name)))
 			return
 
 		context = Context.for_user(self.chat.user)
@@ -74,9 +73,8 @@ class Conversation:
 			self.finish(command, values, context, origin)
 			return
 
-		chat = self.chat
-		if not chat.is_private:
-			chat = self.chat.private_chat()
+		chat = self.chat if self.chat.is_private else self.chat.private_chat()
+		if chat.chat_id != self.chat.chat_id:
 			notice = _("I sent you a direct message to finish this.")
 			if chat.url:
 				notice += " [" + _("Open chat") + f"]({chat.url})"
@@ -151,5 +149,28 @@ class Conversation:
 		frappe.db.delete(STATE_DOCTYPE, {"channel": self.chat.channel, "user": self.chat.user})
 
 
+def unknown_command_text(name):
+	if close := difflib.get_close_matches(name.lower(), COMMANDS, n=1):
+		return _("I don't know **/{0}**. Did you mean **/{1}**?").format(name, close[0])
+	return _("I don't know **/{0}**. Type **/help** to see the commands.").format(name)
+
+
 def error_text(error):
-	return strip_html(str(error)) or _("Unknown error")
+	message = error.args[0] if error.args else ""
+	if isinstance(message, list | tuple):
+		# frappe.msgprint(as_table=True) raises with the rows themselves; its title is only in the message log.
+		rows = [", ".join(map(str, row)) if isinstance(row, list | tuple) else str(row) for row in message]
+		message = "\n".join([message_title(error), *rows])
+	return strip_html(str(message)).strip() or _("Unknown error")
+
+
+def message_title(error):
+	exc_id = getattr(error, "__frappe_exc_id", None)
+	return next(
+		(
+			entry.get("title")
+			for entry in frappe.message_log
+			if exc_id and entry.get("__frappe_exc_id") == exc_id
+		),
+		"",
+	)

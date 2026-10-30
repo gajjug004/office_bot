@@ -2,7 +2,7 @@ import frappe
 from frappe import _
 from frappe.utils import flt, today
 
-from office_bot.channels import raven
+from office_bot import channels
 from office_bot.command import Reply, count_days, date_range
 
 
@@ -25,8 +25,8 @@ def notify_approver(leave: str):
 	if doc.description:
 		lines.append(_("Reason: {0}").format(doc.description))
 	if frappe.get_all("Workflow", filters={"document_type": doc.doctype, "is_active": 1}, limit=1):
-		lines.append(_("Approve or reject it from the workflow menu on the card below."))
-	raven.notify_user(doc.leave_approver, Reply("\n".join(lines), link=(doc.doctype, doc.name)))
+		lines.append(_("Open it to approve or reject. In Raven, use the workflow menu on the card."))
+	channels.notify_user(doc.leave_approver, Reply("\n".join(lines), link=(doc.doctype, doc.name)))
 
 
 def notify_employee(leave: str):
@@ -35,7 +35,7 @@ def notify_employee(leave: str):
 		text = _("**Your leave was {0}**\n{1}: {2}").format(
 			_(doc.status).lower(), doc.leave_type, date_range(doc.from_date, doc.to_date)
 		)
-		raven.notify_user(user, Reply(text, link=(doc.doctype, doc.name)))
+		channels.notify_user(user, Reply(text, link=(doc.doctype, doc.name)))
 
 
 def post_leave_today():
@@ -78,7 +78,7 @@ def post_wfh_today():
 
 def post_list(title, lines):
 	if lines:
-		raven.broadcast(Reply("\n".join([title, *lines])))
+		channels.broadcast(Reply("\n".join([title, *lines])))
 
 
 def get_user(employee):

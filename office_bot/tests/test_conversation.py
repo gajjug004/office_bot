@@ -31,6 +31,13 @@ class Order(Command):
 	def run(self, values, context):
 		if values["count"] > 10:
 			frappe.throw("Too many")
+		if values["count"] == 7:
+			frappe.msgprint(
+				[["Day", "Reason"], ["Mon", "Closed"]],
+				title="Cannot order",
+				as_table=True,
+				raise_exception=True,
+			)
 		return Reply(f"Ordered {values['count']:g} {values['size']}{' hot' if values.get('hot') else ''}")
 
 
@@ -99,6 +106,11 @@ class TestConversation(IntegrationTestCase):
 		self.assertEqual(self.say(dm, "50"), "Could not do that: Too many")
 		self.assertFalse(frappe.db.exists(STATE_DOCTYPE, {"channel": "Test"}))
 
+	def test_table_error_reads_as_lines(self):
+		dm = FakeChat("dm", True)
+		self.say(dm, "/test_order m")
+		self.assertEqual(self.say(dm, "7"), "Could not do that: Cannot order\nDay, Reason\nMon, Closed")
+
 	def test_stop_and_expiry(self):
 		dm = FakeChat("dm", True)
 		self.say(dm, "/test_order")
@@ -113,6 +125,7 @@ class TestConversation(IntegrationTestCase):
 	def test_unknown_command(self):
 		dm = FakeChat("dm", True)
 		self.assertIn("I don't know **/nope**", self.say(dm, "/nope"))
+		self.assertIn("Did you mean **/test_order**?", self.say(dm, "/test_ordr"))
 
 
 class TestPickChoice(IntegrationTestCase):
