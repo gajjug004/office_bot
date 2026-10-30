@@ -5,6 +5,32 @@ app_description = "Chat bot for HR requests (WFH, leave, petty cash) over Raven 
 app_email = "gajjug004@gmail.com"
 app_license = "mit"
 
+required_apps = ["hrms", "raven"]
+
+after_install = "office_bot.install.after_install"
+after_migrate = "office_bot.install.after_migrate"
+
+doc_events = {
+	"Raven Message": {
+		"after_insert": "office_bot.channels.raven.on_message",
+	},
+	"Leave Application": {
+		"after_insert": "office_bot.notifications.on_leave_applied",
+		"on_change": "office_bot.notifications.on_leave_change",
+	},
+}
+
+scheduler_events = {
+	"cron": {
+		"30 10 * * *": [
+			"office_bot.notifications.post_leave_today",
+			"office_bot.notifications.post_wfh_today",
+		],
+		"0 15 * * *": ["office_bot.notifications.post_wfh_today"],
+	},
+	"monthly": ["office_bot.tasks.create_monthly_petty_cash_journal_entry"],
+}
+
 # Send non-GET requests for this app's endpoints as native `application/json`
 # bodies instead of form-encoded, per-key JSON-stringified values.
 use_json_request_body = True
@@ -304,4 +330,3 @@ require_type_annotated_api_methods = True
 # ------------
 # List of apps whose translatable strings should be excluded from this app's translations.
 # ignore_translatable_strings_from = []
-

@@ -1,0 +1,85 @@
+{
+ "actions": [],
+ "allow_bulk_edit": 1,
+ "creation": "2026-10-30 10:46:05.832698",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "raven_bot",
+  "petty_cash_section",
+  "default_company",
+  "column_break_1",
+  "default_cash_account",
+  "hive_section",
+  "hive_sites"
+ ],
+ "fields": [
+  {
+   "description": "Add this bot to a Raven channel to take commands there and post the daily leave and WFH list",
+   "fieldname": "raven_bot",
+   "fieldtype": "Link",
+   "label": "Raven Bot",
+   "options": "Raven Bot"
+  },
+  {
+   "fieldname": "petty_cash_section",
+   "fieldtype": "Section Break",
+   "label": "Petty Cash"
+  },
+  {
+   "fieldname": "default_company",
+   "fieldtype": "Link",
+   "label": "Default Company",
+   "options": "Company"
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Credited in the monthly petty cash journal entry",
+   "fieldname": "default_cash_account",
+   "fieldtype": "Link",
+   "label": "Default Cash Account",
+   "options": "Account"
+  },
+  {
+   "fieldname": "hive_section",
+   "fieldtype": "Section Break",
+   "label": "Hive"
+  },
+  {
+   "fieldname": "hive_sites",
+   "fieldtype": "Table",
+   "label": "Hive Sites",
+   "options": "Office Bot Hive Site"
+  }
+ ],
+ "grid_page_length": 50,
+ "issingle": 1,
+ "link_display_mode": "Search",
+ "links": [],
+ "modified": "2026-10-30 10:46:05.832698",
+ "modified_by": "Administrator",
+ "module": "Office Bot",
+ "name": "Office Bot Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}
