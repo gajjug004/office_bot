@@ -73,13 +73,29 @@ class HiveTask(Command):
 			hive_client.assign_task(site, task, values["assignees"])
 
 		return Reply(
-			_("**Hive task created**: {0}\nDue {1}. [Open in Hive]({2})").format(
+			_("**Hive task created**\n**Task:** {0}\n**Due:** {1}\n[Open in Hive]({2})").format(
 				values["title"], show_date(values["due_date"]), hive_client.task_url(site, task)
 			)
 		)
 
+	def progress(self, values, context):
+		lines = [_("**New Hive task**")]
+		if values.get("site"):
+			lines.append(_("**Site:** {0}").format(hive_client.site_label(get_site(values["site"]))))
+		if values.get("title"):
+			lines.append(_("**Task:** {0}").format(values["title"]))
+		if values.get("description"):
+			lines.append(_("**Description:** {0}").format(values["description"]))
+		if values.get("start_date"):
+			lines.append(_("**Starts:** {0}").format(show_date(values["start_date"])))
+		if values.get("due_date"):
+			lines.append(_("**Due:** {0}").format(show_date(values["due_date"])))
+		return "\n".join(lines) if len(lines) > 1 else ""
+
 	def describe(self, values, context):
-		return _("{0}\nDue {1}").format(values["title"], show_date(values["due_date"]))
+		return _("**Task:** {0}\n**Due:** {1}").format(
+			values["title"], show_date(values["due_date"])
+		)
 
 
 def site_choices():

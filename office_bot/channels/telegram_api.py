@@ -40,7 +40,7 @@ def call(method, **payload):
 	return body["result"]
 
 
-def send_message(chat_key, text, reply_markup=None):
+def send_message(chat_key, text, reply_markup=None, reply_to_message_id=None):
 	chat_id, _separator, thread_id = chat_key.partition(":")
 	payload = {
 		"chat_id": chat_id,
@@ -50,28 +50,43 @@ def send_message(chat_key, text, reply_markup=None):
 	}
 	if thread_id:
 		payload["message_thread_id"] = int(thread_id)
+	if reply_to_message_id:
+		payload["reply_to_message_id"] = reply_to_message_id
 	if reply_markup:
 		payload["reply_markup"] = reply_markup
 	return call("sendMessage", **payload)
 
 
+def edit_message_text(chat_key, message_id, text, reply_markup=None):
+	"""Edit the current Telegram prompt and remove its buttons when the flow ends."""
+	chat_id, _separator, _thread_id = chat_key.partition(":")
+	return call(
+		"editMessageText",
+		chat_id=chat_id,
+		message_id=message_id,
+		text=text,
+		parse_mode="HTML",
+		link_preview_options={"is_disabled": True},
+		reply_markup=reply_markup or {"inline_keyboard": []},
+	)
+
+
+def edit_message_reply_markup(chat_key, message_id):
+	"""Remove inline buttons from a prompt that has been superseded by a typed reply."""
+	chat_id, _separator, _thread_id = chat_key.partition(":")
+	return call(
+		"editMessageReplyMarkup",
+		chat_id=chat_id,
+		message_id=message_id,
+		reply_markup={"inline_keyboard": []},
+	)
+
+
 def answer_callback(callback_query_id, text=None):
 	"""Stop the tapped button's spinner. Only cosmetic, so a failure must not stop the answer itself."""
 	try:
-		call("answerCallbackQuery", callback_query_id=callback_query_id, text=text, show_alert=bool(text))
-	except TelegramError as error:
-		frappe.logger("office_bot").warning(str(error))
-
-
-def show_picked(chat_id, message_id, label):
-	"""Swap a question's buttons for the one that was tapped, so the chat shows the answer. Only cosmetic too."""
-	keyboard = [[{"text": f"✓ {label}", "callback_data": "noop"}]]
-	try:
-		call(
-			"editMessageReplyMarkup",
-			chat_id=chat_id,
-			message_id=message_id,
-			reply_markup={"inline_keyboard": keyboard},
-		)
+		# Telegram shows a null text as "null" over the chat, so leave it out.
+		alert = {"text": text, "show_alert": True} if text else {}
+		call("answerCallbackQuery", callback_query_id=callback_query_id, **alert)
 	except TelegramError as error:
 		frappe.logger("office_bot").warning(str(error))

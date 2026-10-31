@@ -11,6 +11,7 @@ from office_bot.conversation import STATE_DOCTYPE, Conversation
 class Order(Command):
 	name = "test_order"
 	needs_employee = False
+	writes = True
 	fields = (
 		Field(
 			"size",
@@ -27,6 +28,13 @@ class Order(Command):
 
 	def parse(self, text, context):
 		return {"size": text.upper()} if text else {}
+
+	def validate(self, values, context):
+		if values["count"] == 13:
+			frappe.throw("Sold out")
+
+	def describe(self, values, context):
+		return f"{values['count']:g} {values['size']}"
 
 	def run(self, values, context):
 		if values["count"] > 10:
@@ -107,6 +115,12 @@ class TestConversation(IntegrationTestCase):
 		dm = FakeChat("dm", True)
 		self.say(dm, "/test_order m")
 		self.assertEqual(self.say(dm, "50"), "Could not do that: Too many")
+		self.assertFalse(frappe.db.exists(STATE_DOCTYPE, {"channel": "Test"}))
+
+	def test_validation_runs_before_confirmation(self):
+		dm = FakeChat("dm", True)
+		Conversation(dm).start("test_order s", confirm=True)
+		self.assertEqual(self.say(dm, "13"), "Could not do that: Sold out")
 		self.assertFalse(frappe.db.exists(STATE_DOCTYPE, {"channel": "Test"}))
 
 	def test_table_error_reads_as_lines(self):

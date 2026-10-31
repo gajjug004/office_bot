@@ -6,7 +6,7 @@ from frappe import _
 from frappe.utils import add_to_date, getdate, now_datetime, strip_html
 
 from office_bot import understand
-from office_bot.command import Context, Reply
+from office_bot.command import ConfirmField, Context, Reply
 from office_bot.commands import COMMANDS
 
 STATE_DOCTYPE = "Office Bot Conversation"
@@ -74,13 +74,19 @@ class Conversation:
 		try:
 			values.update(field.read(text, values, context))
 		except frappe.ValidationError as error:
-			self.ask(self.chat, field, values, context, problem=error_text(error))
+			self.ask(self.chat, command, field, values, context, problem=error_text(error))
 			return
 
 		self.advance(command, values, context, origin=state.origin_chat)
 
 	def advance(self, command, values, context, origin):
 		field = command.next_field(values)
+		if (field is None or isinstance(field, ConfirmField)) and not self.run_safely(
+			lambda: command.validate(values, context) or True
+		):
+			self.clear_states()
+			return
+
 		if not field:
 			self.clear_states()
 			self.finish(command, values, context, origin)
@@ -93,13 +99,17 @@ class Conversation:
 				notice += " [" + _("Open chat") + f"]({chat.url})"
 			self.chat.send(Reply(notice))
 
-		if self.ask(chat, field, values, context):
+		if self.ask(chat, command, field, values, context):
 			self.save_state(chat.chat_id, command.name, field.key, values, origin)
 		else:
 			self.clear_states()
 
-	def ask(self, chat, field, values, context, problem=""):
-		prompt = self.run_safely(lambda: field.prompt(values, context))
+	def ask(self, chat, command, field, values, context, problem=""):
+		prompt = self.run_safely(
+			lambda: command.prompt(field, values, context)
+			if getattr(chat, "edit_prompts", False)
+			else field.prompt(values, context)
+		)
 		if prompt:
 			if problem:
 				prompt.text = f"{problem}\n{prompt.text}"

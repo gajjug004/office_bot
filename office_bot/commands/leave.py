@@ -2,7 +2,7 @@ import frappe
 from frappe import _
 from frappe.utils import flt, get_fullname
 
-from office_bot.command import Choice, Command, Field, Reply, count_days, date_range
+from office_bot.command import Choice, Command, Field, Reply, count_days, show_date
 from office_bot.commands.time_off import from_date_field, parse_time_off, to_date_field, total_days
 
 
@@ -53,7 +53,7 @@ class ApplyLeave(Command):
 		).insert()
 
 		return Reply(
-			_("**Leave applied** by {0}\n{1}\nWaiting for {2} to approve.").format(
+			_("**Leave applied**\n**Employee:** {0}\n{1}\n**Approval:** Waiting for {2}.").format(
 				application.employee_name,
 				self.describe(values, context),
 				get_fullname(application.leave_approver)
@@ -63,13 +63,24 @@ class ApplyLeave(Command):
 			link=(application.doctype, application.name),
 		)
 
+	def progress(self, values, context):
+		lines = [_("**Apply for leave**")]
+		if values.get("leave_type"):
+			lines.append(_("**Leave type:** {0}").format(values["leave_type"]))
+		if values.get("from_date"):
+			lines.append(_("**From:** {0}").format(show_date(values["from_date"])))
+		return "\n".join(lines) if len(lines) > 1 else ""
+
 	def describe(self, values, context):
-		text = _("{0}: {1}, {2}").format(
-			values["leave_type"],
-			date_range(values["from_date"], values["to_date"]),
-			count_days(total_days(values)),
-		)
-		return f"{text}\n{values['description']}" if values.get("description") else text
+		lines = [
+			_("**Leave type:** {0}").format(values["leave_type"]),
+			_("**From:** {0}").format(show_date(values["from_date"])),
+			_("**To:** {0}").format(show_date(values["to_date"])),
+			_("**Duration:** {0}").format(count_days(total_days(values))),
+		]
+		if values.get("description"):
+			lines.append(_("**Reason:** {0}").format(values["description"]))
+		return "\n".join(lines)
 
 
 def leave_type_choices(context):

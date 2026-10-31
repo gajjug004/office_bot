@@ -59,10 +59,20 @@ def connection_status():
 	return {"url": url, "this_site": url == get_url(WEBHOOK_PATH)}
 
 
-def handle(chat_key: str, text: str, tap: dict | None = None):
+def handle(chat_key: str, text: str, tap: dict | None = None, reply_to_message_id=None):
+	chat = TelegramChat(chat_key, frappe.session.user)
+	conversation = Conversation(chat)
 	if tap:
-		telegram_api.show_picked(chat_key.partition(":")[0], tap["message_id"], tap["label"])
-	Conversation(TelegramChat(chat_key, frappe.session.user)).handle(text)
+		if not is_current_prompt(chat_key, chat.user, tap["message_id"], tap["token"]):
+			return
+		chat.prompt_message_id = tap["message_id"]
+	elif text.startswith("/") or not conversation.get_state():
+		chat.reply_to_message_id = reply_to_message_id
+		clear_prompt(chat_key, chat.user)
+	elif reply_to_message_id:
+		chat.reply_to_message_id = reply_to_message_id
+		frappe.cache.set_value(text_mode_key(chat_key, chat.user), True, expires_in_sec=PROMPT_TIMEOUT)
+	conversation.handle(text)
 
 
 def notify_user(user, reply):
@@ -92,22 +102,59 @@ class TelegramChat:
 
 	channel = CHANNEL
 	url = None
+	edit_prompts = True
 
 	def __init__(self, chat_id, user):
 		self.chat_id = str(chat_id)
 		self.user = user
+		self.reply_to_message_id = None
+		self.prompt_message_id = None
 
 	@property
 	def is_private(self):
 		return not self.chat_id.startswith("-")
 
 	def send(self, reply):
-		text, markup = render(reply, self.is_private)
-		sent = telegram_api.send_message(self.chat_id, text, markup)
+		key = prompt_key(self.chat_id, self.user)
+		message_id = self.prompt_message_id or frappe.cache.get_value(key)
+		text_mode = frappe.cache.get_value(text_mode_key(self.chat_id, self.user))
+		token = frappe.generate_hash(length=8) if reply.asks else None
+		text, markup = render(
+			reply, self.is_private, editing=bool(message_id and not text_mode), prompt_token=token or "0"
+		)
+		if message_id and text_mode:
+			try:
+				telegram_api.edit_message_reply_markup(self.chat_id, message_id)
+			except TelegramError as error:
+				frappe.logger("office_bot").warning(str(error))
+			sent = self.send_new_message(text, markup)
+			message_id = sent["message_id"]
+		elif message_id:
+			try:
+				telegram_api.edit_message_text(self.chat_id, message_id, text, markup)
+			except TelegramError as error:
+				frappe.logger("office_bot").warning(str(error))
+				text, markup = render(reply, self.is_private, prompt_token=token or "0")
+				sent = self.send_new_message(text, markup)
+				message_id = sent["message_id"]
+		else:
+			sent = self.send_new_message(text, markup)
+			message_id = sent["message_id"]
+
 		if reply.asks:
-			frappe.cache.set_value(
-				prompt_key(self.chat_id, self.user), sent["message_id"], expires_in_sec=PROMPT_TIMEOUT
-			)
+			frappe.cache.set_value(key, message_id, expires_in_sec=PROMPT_TIMEOUT)
+			frappe.cache.set_value(prompt_token_key(self.chat_id, self.user), token, expires_in_sec=PROMPT_TIMEOUT)
+		else:
+			clear_prompt(self.chat_id, self.user)
+		self.prompt_message_id = None
+
+	def send_new_message(self, text, markup):
+		return telegram_api.send_message(
+			self.chat_id,
+			text,
+			markup,
+			reply_to_message_id=self.reply_to_message_id,
+		)
 
 	def private_chat(self):
 		# A bot cannot message someone who never opened a chat with it, so questions stay in the group.
@@ -119,13 +166,14 @@ class TelegramChat:
 
 def receive_text(message):
 	chat = message["chat"]
-	text = BOT_SUFFIX.sub(r"\1", message["text"].strip())
+	text, mentioned = strip_bot_mention(BOT_SUFFIX.sub(r"\1", message["text"].strip()))
 	is_command = text.startswith("/")
 	if not is_allowed_chat(chat):
 		if is_command:
 			telegram_api.send_message(get_chat_key(message), unknown_group_text(chat))
 		return
-	if not (chat["type"] == "private" or is_command or is_reply_to_bot(message)):
+	reply_to_bot = is_reply_to_bot(message)
+	if not (chat["type"] == "private" or is_command or mentioned or reply_to_bot):
 		return
 
 	user = find_user(message["from"])
@@ -133,7 +181,16 @@ def receive_text(message):
 		if is_command:
 			telegram_api.send_message(get_chat_key(message), unknown_user_text(message["from"]))
 		return
-	enqueue_as(user, chat_key=get_chat_key(message), text=text)
+	if reply_to_bot and not (is_command or mentioned) and not is_current_prompt(
+		get_chat_key(message), user, (message.get("reply_to_message") or {}).get("message_id")
+	):
+		return
+	enqueue_as(
+		user,
+		chat_key=get_chat_key(message),
+		text=text,
+		reply_to_message_id=message["message_id"],
+	)
 
 
 def receive_tap(callback):
@@ -141,6 +198,11 @@ def receive_tap(callback):
 	data = callback.get("data") or ""
 	if not message or not data.startswith("pick:"):
 		telegram_api.answer_callback(callback["id"])
+		return
+	try:
+		_token, token, number = data.split(":", 2)
+	except ValueError:
+		telegram_api.answer_callback(callback["id"], _("This question is not for you, or it has timed out."))
 		return
 
 	user = find_user(callback["from"])
@@ -150,13 +212,13 @@ def receive_tap(callback):
 
 	# Telegram only accepts an answer to a tap for a few seconds, so answer here, not in the job.
 	chat_key = get_chat_key(message)
-	if not is_current_prompt(chat_key, user, message["message_id"]):
+	if not is_current_prompt(chat_key, user, message["message_id"], token):
 		telegram_api.answer_callback(callback["id"], _("This question is not for you, or it has timed out."))
 		return
 	telegram_api.answer_callback(callback["id"])
 
-	tap = {"message_id": message["message_id"], "label": button_label(message, data)}
-	enqueue_as(user, chat_key=chat_key, text=data.removeprefix("pick:"), tap=tap)
+	tap = {"message_id": message["message_id"], "token": token}
+	enqueue_as(user, chat_key=chat_key, text=number, tap=tap)
 
 
 def enqueue_as(user, **kwargs):
@@ -201,6 +263,16 @@ def is_allowed_chat(chat):
 	)
 
 
+def strip_bot_mention(text):
+	"""In groups Telegram only hands the bot commands, replies and @mentions, so a mention addresses the bot."""
+	username = frappe.db.get_single_value("Office Bot Settings", "telegram_bot_username")
+	if not username:
+		return text, False
+	mention = re.compile(rf"(?<!\w)@{re.escape(username)}\b", re.IGNORECASE)
+	text, found = mention.subn("", text)
+	return text.strip(), bool(found)
+
+
 def is_reply_to_bot(message):
 	sender = (message.get("reply_to_message") or {}).get("from") or {}
 	return sender.get("is_bot") and sender.get("username") == frappe.db.get_single_value(
@@ -214,18 +286,29 @@ def get_chat_key(message):
 	return str(message["chat"]["id"])
 
 
-def button_label(message, data):
-	rows = (message.get("reply_markup") or {}).get("inline_keyboard") or []
-	return next((button["text"] for row in rows for button in row if button.get("callback_data") == data), "")
-
-
-def is_current_prompt(chat_key, user, message_id):
+def is_current_prompt(chat_key, user, message_id, token=None):
 	"""Taps on an older question's buttons, or on someone else's, must not answer the current one."""
-	return frappe.cache.get_value(prompt_key(chat_key, user)) == message_id
+	if frappe.cache.get_value(prompt_key(chat_key, user)) != message_id:
+		return False
+	return token is None or frappe.cache.get_value(prompt_token_key(chat_key, user)) == token
 
 
 def prompt_key(chat_key, user):
 	return f"office_bot:telegram_prompt:{chat_key}:{user}"
+
+
+def prompt_token_key(chat_key, user):
+	return f"office_bot:telegram_prompt_token:{chat_key}:{user}"
+
+
+def text_mode_key(chat_key, user):
+	return f"office_bot:telegram_text_mode:{chat_key}:{user}"
+
+
+def clear_prompt(chat_key, user):
+	frappe.cache.delete_value(prompt_key(chat_key, user))
+	frappe.cache.delete_value(prompt_token_key(chat_key, user))
+	frappe.cache.delete_value(text_mode_key(chat_key, user))
 
 
 def unknown_user_text(sender, html=True):
@@ -241,7 +324,7 @@ def unknown_group_text(chat):
 	).format(f"<code>{chat['id']}</code>")
 
 
-def render(reply, is_private):
+def render(reply, is_private, editing=False, prompt_token="0"):
 	"""Telegram HTML, plus buttons for the choices, or a reply box for typed answers in groups."""
 	lines = [to_html(line, bold_tag="b") for line in reply.text.split("\n") if line.strip()]
 	buttons = bool(reply.choices) and not reply.multiple
@@ -251,6 +334,9 @@ def render(reply, is_private):
 	hint = hint_sentence(reply, numbered=not buttons)
 	if hint and buttons and not is_private:
 		hint += " " + _("Reply to this message to type it.")
+	elif reply.asks and not is_private and editing:
+		hint = f"{hint} " if hint else ""
+		hint += _("Reply to this message with your answer.")
 	if hint:
 		lines.append(f"<i>{escape_html(hint)}</i>")
 	if reply.link:
@@ -261,12 +347,30 @@ def render(reply, is_private):
 
 	markup = None
 	if buttons:
+		choice_rows = [[choice] for choice in reply.choices]
+		confirmation = len(reply.choices) == 2 and {
+			choice.lower() for choice in reply.choices
+		} <= {"yes", "no", "yes, go ahead"}
+		if confirmation or all(is_date_choice(choice) for choice in reply.choices):
+			choice_rows = [reply.choices[index : index + 2] for index in range(0, len(reply.choices), 2)]
+		keyboard = []
+		number = 1
+		for row in choice_rows:
+			keyboard.append(
+				[
+					{"text": choice, "callback_data": f"pick:{prompt_token}:{number + offset}"}
+					for offset, choice in enumerate(row)
+				]
+			)
+			number += len(row)
 		markup = {
-			"inline_keyboard": [
-				[{"text": choice, "callback_data": f"pick:{number}"}]
-				for number, choice in enumerate(reply.choices, 1)
-			]
+			"inline_keyboard": keyboard
 		}
-	elif reply.asks and not is_private:
+	elif reply.asks and not is_private and not editing:
 		markup = {"force_reply": True}
 	return "\n".join(lines), markup
+
+
+def is_date_choice(choice):
+	first_word = choice.split(maxsplit=1)[0]
+	return first_word in {"Today", "Tomorrow", "Day", "Next", "Same", "+1", "+2", "+4"}

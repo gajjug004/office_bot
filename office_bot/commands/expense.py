@@ -54,18 +54,38 @@ class PettyCashExpense(Command):
 		).insert()
 
 		return Reply(
-			_("**Petty cash recorded** by {0}\n{1}").format(
+			_("**Petty cash recorded**\n**Employee:** {0}\n{1}").format(
 				usage.employee_name, self.describe(values, context)
 			),
 			link=(usage.doctype, usage.name),
 		)
 
+	def progress(self, values, context):
+		lines = [_("**Petty cash expense**")]
+		if values.get("amount"):
+			lines.append(
+				_("**Amount:** {0}").format(
+					fmt_money(values["amount"], currency=frappe.db.get_default("currency"))
+				)
+			)
+		if values.get("category"):
+			lines.append(_("**Category:** {0}").format(values["category"]))
+		if values.get("expense_date"):
+			lines.append(_("**Date:** {0}").format(show_date(values["expense_date"])))
+		if values.get("remarks"):
+			lines.append(_("**For:** {0}").format(values["remarks"]))
+		return "\n".join(lines) if len(lines) > 1 else ""
+
 	def describe(self, values, context):
-		return _("{0} for {1} on {2}: {3}").format(
-			fmt_money(values["amount"], currency=frappe.db.get_default("currency")),
-			values["category"],
-			show_date(expense_date(values, context)),
-			values["remarks"],
+		return "\n".join(
+			(
+				_("**Amount:** {0}").format(
+					fmt_money(values["amount"], currency=frappe.db.get_default("currency"))
+				),
+				_("**Category:** {0}").format(values["category"]),
+				_("**Date:** {0}").format(show_date(expense_date(values, context))),
+				_("**For:** {0}").format(values["remarks"]),
+			)
 		)
 
 

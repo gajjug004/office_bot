@@ -50,7 +50,10 @@ class TestUnderstand(IntegrationTestCase):
 		dm = FakeChat("dm", True)
 		with model_calls("run_command", command="test_booking", details="blue"):
 			reply = self.say(dm, "book the blue room please")
-		self.assertEqual(reply, "**Book a room** for Administrator\nRoom blue\nShall I go ahead?")
+		self.assertEqual(
+			reply,
+			"**Book a room**\n**Requested by:** Administrator\n\nRoom blue\n\nShall I go ahead?",
+		)
 		self.assertEqual(self.say(dm, "yes"), "Booked blue")
 
 	def test_saying_no_creates_nothing(self):

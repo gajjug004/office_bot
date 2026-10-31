@@ -135,6 +135,19 @@ class Command:
 		"""Values the user already gave on the command line, like `/wfh tomorrow`."""
 		return {}
 
+	def validate(self, values: dict, context: Context):
+		"""Refuse bad values before asking the user to confirm them."""
+
+	def progress(self, values: dict, context: Context) -> str:
+		"""Values to keep visible above the current question while a conversation advances."""
+		return ""
+
+	def prompt(self, field, values, context):
+		reply = field.prompt(values, context)
+		if progress := self.progress(values, context):
+			reply.text = f"{progress}\n\n{reply.text}"
+		return reply
+
 	def run(self, values: dict, context: Context) -> Reply:
 		raise NotImplementedError
 
@@ -166,8 +179,12 @@ class ConfirmField(Field):
 
 	def prompt(self, values, context):
 		reply = super().prompt(values, context)
-		reply.text = _("**{0}** for {1}\n{2}\nShall I go ahead?").format(
-			_(self.command.description), get_fullname(context.user), self.command.describe(values, context)
+		person_label = _("Employee") if context.employee else _("Requested by")
+		reply.text = _("**{0}**\n**{1}:** {2}\n\n{3}\n\nShall I go ahead?").format(
+			_(self.command.description),
+			person_label,
+			get_fullname(context.user),
+			self.command.describe(values, context),
 		)
 		return reply
 
