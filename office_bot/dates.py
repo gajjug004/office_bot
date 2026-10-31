@@ -73,6 +73,9 @@ def extract_dates(text: str, today: datetime.date) -> tuple[list[datetime.date],
 def longest_date_at(words: list[str], index: int, today: datetime.date):
 	for size in range(MAX_PHRASE_WORDS, 0, -1):
 		phrase = words[index : index + size]
+		# In free text a lone number is a count, like "cab for 2 people", not a day of the month.
+		if size == 1 and phrase[0].isdigit():
+			continue
 		if len(phrase) == size and (date := parse_date(" ".join(phrase), today)):
 			return size, date
 	return 0, None

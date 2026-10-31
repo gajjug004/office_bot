@@ -15,6 +15,7 @@ class HiveTask(Command):
 	description = "Create a task in Hive"
 	usage = "/task Fix the login page"
 	needs_employee = False
+	writes = True
 	fields = (
 		Field(
 			"site",
@@ -76,6 +77,9 @@ class HiveTask(Command):
 				values["title"], show_date(values["due_date"]), hive_client.task_url(site, task)
 			)
 		)
+
+	def describe(self, values, context):
+		return _("{0}\nDue {1}").format(values["title"], show_date(values["due_date"]))
 
 
 def site_choices():

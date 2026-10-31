@@ -7,6 +7,12 @@
  "engine": "InnoDB",
  "field_order": [
   "raven_bot",
+  "ai_section",
+  "enable_ai",
+  "ai_base_url",
+  "column_break_ai",
+  "ai_model",
+  "ai_api_key",
   "petty_cash_section",
   "default_company",
   "column_break_1",
@@ -114,13 +120,53 @@
    "fieldtype": "Table",
    "label": "Telegram Users",
    "options": "Office Bot Telegram User"
+  },
+  {
+   "fieldname": "ai_section",
+   "fieldtype": "Section Break",
+   "label": "Plain English"
+  },
+  {
+   "default": "0",
+   "description": "People can write requests in their own words, like \"wfh tomorrow\". An AI model turns them into commands, and the bot asks before it creates anything.",
+   "fieldname": "enable_ai",
+   "fieldtype": "Check",
+   "label": "Understand Plain English"
+  },
+  {
+   "default": "https://openrouter.ai/api/v1",
+   "depends_on": "enable_ai",
+   "description": "Any OpenAI-compatible API",
+   "fieldname": "ai_base_url",
+   "fieldtype": "Data",
+   "label": "API Base URL",
+   "mandatory_depends_on": "enable_ai"
+  },
+  {
+   "fieldname": "column_break_ai",
+   "fieldtype": "Column Break"
+  },
+  {
+   "depends_on": "enable_ai",
+   "description": "Must support tool calls, like deepseek/deepseek-v4.1-flash",
+   "fieldname": "ai_model",
+   "fieldtype": "Data",
+   "label": "Model",
+   "mandatory_depends_on": "enable_ai"
+  },
+  {
+   "depends_on": "enable_ai",
+   "fieldname": "ai_api_key",
+   "fieldtype": "Password",
+   "label": "API Key",
+   "mandatory_depends_on": "enable_ai"
   }
  ],
  "grid_page_length": 50,
  "issingle": 1,
  "link_display_mode": "Search",
  "links": [],
- "modified": "2026-10-30 11:58:07.777567",
+ "modified": "2026-10-31 13:53:08.146373",
  "modified_by": "Administrator",
  "module": "Office Bot",
  "name": "Office Bot Settings",

@@ -37,6 +37,7 @@ class CancelRequest(Command):
 	aliases = ("withdraw",)
 	description = "Withdraw an upcoming work from home or a pending leave"
 	usage = "/cancel"
+	writes = True
 	fields = (
 		Field(
 			"request",
@@ -68,6 +69,10 @@ class CancelRequest(Command):
 		else:
 			doc.delete(ignore_permissions=True)
 		return Reply(_("**Withdrawn** {0} {1}").format(_(doctype), show_date(doc.from_date)))
+
+	def describe(self, values, context):
+		name = values["request"][1]
+		return next(request.label for request in get_upcoming_requests(context) if request.name == name)
 
 
 def get_upcoming_requests(context):

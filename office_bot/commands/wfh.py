@@ -9,6 +9,7 @@ class WorkFromHome(Command):
 	name = "wfh"
 	description = "Apply for work from home"
 	usage = "/wfh tomorrow, /wfh 3 nov to 5 nov, /wfh today half"
+	writes = True
 	fields = (
 		from_date_field("**Work from home**\nFrom which date?"),
 		to_date_field(),
@@ -38,10 +39,15 @@ class WorkFromHome(Command):
 		request.submit()
 
 		return Reply(
-			_("**Work from home submitted** for {0}\n{1}, {2}").format(
-				request.employee_name, date_range(values["from_date"], values["to_date"]), count_days(days)
+			_("**Work from home submitted** for {0}\n{1}").format(
+				request.employee_name, self.describe(values, context)
 			),
 			link=(request.doctype, request.name),
+		)
+
+	def describe(self, values, context):
+		return _("{0}, {1}").format(
+			date_range(values["from_date"], values["to_date"]), count_days(total_days(values))
 		)
 
 

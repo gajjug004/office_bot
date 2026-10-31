@@ -14,7 +14,9 @@ def on_message(doc, method=None):
 		return
 
 	bot = get_bot()
-	if not bot or not (is_bot_dm(bot, doc.channel_id) or is_command_for_bot(bot, doc)):
+	if not bot or not (
+		is_bot_dm(bot, doc.channel_id) or is_command_for_bot(bot, doc) or is_mention_of_bot(bot, doc)
+	):
 		return
 
 	frappe.enqueue(
@@ -97,6 +99,10 @@ def is_bot_dm(bot, channel_id):
 
 def is_command_for_bot(bot, message):
 	return message.content.lstrip().startswith("/") and bool(bot.is_member(message.channel_id))
+
+
+def is_mention_of_bot(bot, message):
+	return any(mention.user == bot.raven_user for mention in message.mentions)
 
 
 def render_html(reply):

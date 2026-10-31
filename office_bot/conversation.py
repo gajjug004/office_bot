@@ -3,8 +3,9 @@ import json
 
 import frappe
 from frappe import _
-from frappe.utils import add_to_date, now_datetime, strip_html
+from frappe.utils import add_to_date, getdate, now_datetime, strip_html
 
+from office_bot import understand
 from office_bot.command import Context, Reply
 from office_bot.commands import COMMANDS
 
@@ -29,10 +30,20 @@ class Conversation:
 			self.start(text[1:])
 		elif state := self.get_state():
 			self.answer(state, text)
+		elif understand.is_enabled():
+			self.run_plain_english(text)
 		elif self.chat.is_private:
 			self.chat.send(Reply(_("Type **/help** to see what I can do.")))
 
-	def start(self, text):
+	def run_plain_english(self, text):
+		try:
+			command = understand.to_command(text, getdate())
+		except understand.NotUnderstood as error:
+			self.chat.send(Reply(str(error)))
+			return
+		self.start(command, confirm=True)
+
+	def start(self, text, confirm=False):
 		name, _separator, args = text.partition(" ")
 		command = COMMANDS.get(name.lower())
 		if not command:
@@ -46,6 +57,8 @@ class Conversation:
 
 		values = self.run_safely(lambda: command.parse(args.strip(), context))
 		if values is not None:
+			if confirm:
+				values["confirm"] = True
 			self.advance(command, values, context, origin=self.chat.chat_id)
 
 	def answer(self, state, text):
@@ -94,6 +107,10 @@ class Conversation:
 		return prompt
 
 	def finish(self, command, values, context, origin):
+		if values.get("confirmed") is False:
+			self.chat.send(Reply(_("Stopped. Nothing was created.")))
+			return
+
 		reply = self.run_safely(lambda: command.run(values, context))
 		if not reply:
 			return

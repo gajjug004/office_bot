@@ -67,6 +67,9 @@ class TestConversation(IntegrationTestCase):
 	def setUp(self):
 		FakeChat.chats = {}
 		frappe.db.delete(STATE_DOCTYPE, {"channel": "Test"})
+		enabled = frappe.db.get_single_value("Office Bot Settings", "enable_ai")
+		frappe.db.set_single_value("Office Bot Settings", "enable_ai", 0)
+		self.addCleanup(frappe.db.set_single_value, "Office Bot Settings", "enable_ai", enabled)
 
 	def say(self, chat, text):
 		Conversation(chat).handle(text)

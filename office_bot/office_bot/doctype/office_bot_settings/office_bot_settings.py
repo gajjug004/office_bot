@@ -22,8 +22,12 @@ class OfficeBotSettings(Document):
 			OfficeBotTelegramUser,
 		)
 
+		ai_api_key: DF.Password | None
+		ai_base_url: DF.Data | None
+		ai_model: DF.Data | None
 		default_cash_account: DF.Link | None
 		default_company: DF.Link | None
+		enable_ai: DF.Check
 		hive_sites: DF.Table[OfficeBotHiveSite]
 		raven_bot: DF.Link | None
 		telegram_bot_token: DF.Password | None
