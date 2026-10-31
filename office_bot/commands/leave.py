@@ -11,6 +11,7 @@ class ApplyLeave(Command):
 	aliases = ("leave_application",)
 	description = "Apply for leave"
 	usage = "/leave casual tomorrow, /leave sick 3 nov to 5 nov fever, /leave casual fri half"
+	writes = True
 	fields = (
 		Field(
 			"leave_type",
@@ -25,6 +26,8 @@ class ApplyLeave(Command):
 	def parse(self, text, context):
 		values, rest = parse_time_off(text, context)
 		leave_types = [choice.values["leave_type"] for choice in leave_type_choices(context)]
+		if not leave_types:
+			frappe.throw(_("You have no leave allocated for today. Ask HR to allocate your leave."))
 		if rest and (leave_type := match_leave_type(rest[0], leave_types)):
 			values["leave_type"] = leave_type
 			rest = rest[1:]
@@ -50,17 +53,23 @@ class ApplyLeave(Command):
 		).insert()
 
 		return Reply(
-			_("**Leave applied** by {0}\n{1}: {2}, {3}\nWaiting for {4} to approve.").format(
+			_("**Leave applied** by {0}\n{1}\nWaiting for {2} to approve.").format(
 				application.employee_name,
-				application.leave_type,
-				date_range(values["from_date"], values["to_date"]),
-				count_days(total_days(values)),
+				self.describe(values, context),
 				get_fullname(application.leave_approver)
 				if application.leave_approver
 				else _("your approver"),
 			),
 			link=(application.doctype, application.name),
 		)
+
+	def describe(self, values, context):
+		text = _("{0}: {1}, {2}").format(
+			values["leave_type"],
+			date_range(values["from_date"], values["to_date"]),
+			count_days(total_days(values)),
+		)
+		return f"{text}\n{values['description']}" if values.get("description") else text
 
 
 def leave_type_choices(context):

@@ -14,6 +14,7 @@ class PettyCashExpense(Command):
 	)
 	description = "Record a petty cash expense"
 	usage = "/expense 250 food team lunch, /expense 1200 travel cab to client yesterday"
+	writes = True
 	fields = (
 		Field("amount", "**Petty cash expense**\nHow much did you spend?", "number"),
 		Field("category", "Which category?", "choice", choices=lambda values, context: category_choices()),
@@ -48,20 +49,28 @@ class PettyCashExpense(Command):
 				"amount": values["amount"],
 				"category": values["category"],
 				"remarks": values["remarks"],
-				"expense_date": values.get("expense_date") or str(context.today),
+				"expense_date": expense_date(values, context),
 			}
 		).insert()
 
 		return Reply(
-			_("**Petty cash recorded** by {0}\n{1} for {2} on {3}: {4}").format(
-				usage.employee_name,
-				fmt_money(usage.amount, currency=frappe.db.get_default("currency")),
-				usage.category,
-				show_date(usage.expense_date),
-				usage.remarks,
+			_("**Petty cash recorded** by {0}\n{1}").format(
+				usage.employee_name, self.describe(values, context)
 			),
 			link=(usage.doctype, usage.name),
 		)
+
+	def describe(self, values, context):
+		return _("{0} for {1} on {2}: {3}").format(
+			fmt_money(values["amount"], currency=frappe.db.get_default("currency")),
+			values["category"],
+			show_date(expense_date(values, context)),
+			values["remarks"],
+		)
+
+
+def expense_date(values, context):
+	return values.get("expense_date") or str(context.today)
 
 
 def category_choices():

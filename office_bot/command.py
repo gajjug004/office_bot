@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 
 import frappe
 from frappe import _
-from frappe.utils import flt, formatdate, getdate
+from frappe.utils import flt, formatdate, get_fullname, getdate
 
 from office_bot.dates import parse_date
 
@@ -121,6 +121,7 @@ class Command:
 	description = ""
 	usage = ""
 	needs_employee = True
+	writes = False
 	fields: tuple[Field, ...] = ()
 
 	def __init_subclass__(cls, **kwargs):
@@ -137,11 +138,38 @@ class Command:
 	def run(self, values: dict, context: Context) -> Reply:
 		raise NotImplementedError
 
+	def describe(self, values: dict, context: Context) -> str:
+		raise NotImplementedError
+
 	def next_field(self, values):
-		return next((field for field in self.fields if field.key not in values), None)
+		field = next((field for field in self.fields if field.key not in values), None)
+		if not field and self.writes and values.get("confirm") and "confirmed" not in values:
+			return ConfirmField(self)
+		return field
 
 	def get_field(self, key):
-		return next(field for field in self.fields if field.key == key)
+		return next(field for field in (*self.fields, ConfirmField(self)) if field.key == key)
+
+
+class ConfirmField(Field):
+	def __init__(self, command):
+		super().__init__(
+			"confirmed",
+			"",
+			"choice",
+			choices=lambda values, context: [
+				Choice(_("Yes, go ahead"), {"confirmed": True}),
+				Choice(_("No"), {"confirmed": False}),
+			],
+		)
+		self.command = command
+
+	def prompt(self, values, context):
+		reply = super().prompt(values, context)
+		reply.text = _("**{0}** for {1}\n{2}\nShall I go ahead?").format(
+			_(self.command.description), get_fullname(context.user), self.command.describe(values, context)
+		)
+		return reply
 
 
 def hint_sentence(reply, numbered):

@@ -44,3 +44,8 @@ class TestExtractDates(unittest.TestCase):
 
 	def test_range_word_kept_without_a_date_before_it(self):
 		self.assertEqual(extract_dates("to the doctor", TODAY), ([], ["to", "the", "doctor"]))
+
+	def test_lone_number_is_not_a_date(self):
+		self.assertEqual(
+			extract_dates("cab for 2 people 30 oct", TODAY), ([day(10, 30)], ["cab", "for", "2", "people"])
+		)

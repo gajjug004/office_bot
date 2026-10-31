@@ -19,6 +19,18 @@ Type everything on one line, or leave parts out and the bot asks for them.
 
 Dates can be `today`, `tomorrow`, `fri`, `next mon`, `5 nov` or `05-11-2026`. Type `stop` to end a question.
 
+### Plain English
+
+Turn on **Understand Plain English** in Office Bot Settings and people can skip the commands. They write "need wfh tomorrow" or "casual leave next friday, cousin's wedding", and the bot does the rest.
+
+- An AI model only picks the command and fills in its words. It never writes a reply and never sees any records.
+- Its answer goes through the same parsing and questions as a typed command. Anything missing is asked for.
+- Before it creates or withdraws anything, the bot shows what it understood, for whom, and asks **Shall I go ahead?**
+- Every request is for the person who wrote it. The model has no way to name another employee, and asks for someone else are refused.
+- In Raven, write to the bot in a direct message or mention it in a channel. In Telegram, write in a direct message or reply to the bot in a group.
+
+Any OpenAI-compatible API works. Set **API Base URL**, **Model** and **API Key**. The model must support tool calls. For example, use `https://openrouter.ai/api/v1` with `deepseek/deepseek-v4.1-flash`.
+
 ### How it works in Raven
 
 - Talk to **Office Bot** in a direct message, or add the bot to a channel and type commands there.
