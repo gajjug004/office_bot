@@ -2,6 +2,8 @@
 
 Apply for work from home, leave and petty cash from chat, in [Raven](https://github.com/frappe/raven) and Telegram. The commands do not depend on the chat app, so both work the same way and more channels can plug in later.
 
+See the **[Office Bot User Manual](docs/user-manual.md)** for setup instructions, employee and approver workflows, examples, and troubleshooting.
+
 ### Commands
 
 Type everything on one line, or leave parts out and the bot asks for them.
@@ -29,7 +31,7 @@ Turn on **Understand Plain English** in Office Bot Settings and people can skip 
 - Every request is for the person who wrote it. The model has no way to name another employee, and asks for someone else are refused.
 - In Raven, write to the bot in a direct message or mention it in a channel. In Telegram, write in a direct message, or mention or reply to the bot in a group.
 
-Any OpenAI-compatible API works. Set **API Base URL**, **Model** and **API Key**. The model must support tool calls. For example, use `https://openrouter.ai/api/v1` with `deepseek/deepseek-v4.1-flash`.
+Choose a provider and tool-capable model in Office Bot Settings, then add its API key. The model list comes from the public catalog; custom OpenAI-compatible providers can use an API Base URL and model ID. See the [user manual](docs/user-manual.md#setup-plain-english-requests) for setup steps.
 
 ### How it works in Raven
 
