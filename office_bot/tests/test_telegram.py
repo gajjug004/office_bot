@@ -6,7 +6,7 @@ import frappe
 import requests
 from frappe.tests import IntegrationTestCase
 
-from office_bot.channels import telegram
+from office_bot.channels import telegram, telegram_api
 from office_bot.channels.telegram_api import TelegramError
 from office_bot.channels.telegram_api import call as real_call
 from office_bot.command import Reply
@@ -175,3 +175,22 @@ class TestTelegram(IntegrationTestCase):
 		)
 		self.assertIn("1. Ann\n2. Bo", text)
 		self.assertIsNone(markup)
+
+	def test_long_choices_get_a_row_each_and_yes_no_share_one(self):
+		_text, markup = telegram.render(
+			Reply("When?", choices=["Same day (Mon 9 Nov)", "Same day, half day (Mon 9 Nov)"], asks=True),
+			is_private=True,
+		)
+		self.assertEqual([len(row) for row in markup["inline_keyboard"]], [1, 1])
+
+		_text, markup = telegram.render(
+			Reply("Sure?", choices=["Yes, go ahead", "No"], asks=True), is_private=True
+		)
+		self.assertEqual([len(row) for row in markup["inline_keyboard"]], [2])
+
+	def test_superseded_prompt_keeps_the_tapped_answer(self):
+		telegram_api.edit_message_reply_markup(str(ME["id"]), 5, "Same day (Mon 9 Nov)")
+		self.assertEqual(
+			self.sent("editMessageReplyMarkup")[-1]["reply_markup"],
+			{"inline_keyboard": [[{"text": "✓ Same day (Mon 9 Nov)", "callback_data": "noop"}]]},
+		)

@@ -66,6 +66,7 @@ def handle(chat_key: str, text: str, tap: dict | None = None, reply_to_message_i
 		if not is_current_prompt(chat_key, chat.user, tap["message_id"], tap["token"]):
 			return
 		chat.prompt_message_id = tap["message_id"]
+		chat.picked_label = tap.get("label")
 	elif text.startswith("/") or not conversation.get_state():
 		chat.reply_to_message_id = reply_to_message_id
 		clear_prompt(chat_key, chat.user)
@@ -109,6 +110,7 @@ class TelegramChat:
 		self.user = user
 		self.reply_to_message_id = None
 		self.prompt_message_id = None
+		self.picked_label = None
 
 	@property
 	def is_private(self):
@@ -124,7 +126,7 @@ class TelegramChat:
 		)
 		if message_id and text_mode:
 			try:
-				telegram_api.edit_message_reply_markup(self.chat_id, message_id)
+				telegram_api.edit_message_reply_markup(self.chat_id, message_id, self.picked_label)
 			except TelegramError as error:
 				frappe.logger("office_bot").warning(str(error))
 			sent = self.send_new_message(text, markup)
@@ -143,7 +145,9 @@ class TelegramChat:
 
 		if reply.asks:
 			frappe.cache.set_value(key, message_id, expires_in_sec=PROMPT_TIMEOUT)
-			frappe.cache.set_value(prompt_token_key(self.chat_id, self.user), token, expires_in_sec=PROMPT_TIMEOUT)
+			frappe.cache.set_value(
+				prompt_token_key(self.chat_id, self.user), token, expires_in_sec=PROMPT_TIMEOUT
+			)
 		else:
 			clear_prompt(self.chat_id, self.user)
 		self.prompt_message_id = None
@@ -181,8 +185,12 @@ def receive_text(message):
 		if is_command:
 			telegram_api.send_message(get_chat_key(message), unknown_user_text(message["from"]))
 		return
-	if reply_to_bot and not (is_command or mentioned) and not is_current_prompt(
-		get_chat_key(message), user, (message.get("reply_to_message") or {}).get("message_id")
+	if (
+		reply_to_bot
+		and not (is_command or mentioned)
+		and not is_current_prompt(
+			get_chat_key(message), user, (message.get("reply_to_message") or {}).get("message_id")
+		)
 	):
 		return
 	enqueue_as(
@@ -217,7 +225,11 @@ def receive_tap(callback):
 		return
 	telegram_api.answer_callback(callback["id"])
 
-	tap = {"message_id": message["message_id"], "token": token}
+	rows = (message.get("reply_markup") or {}).get("inline_keyboard") or []
+	label = next(
+		(button["text"] for row in rows for button in row if button.get("callback_data") == data), ""
+	)
+	tap = {"message_id": message["message_id"], "token": token, "label": label}
 	enqueue_as(user, chat_key=chat_key, text=number, tap=tap)
 
 
@@ -348,11 +360,13 @@ def render(reply, is_private, editing=False, prompt_token="0"):
 	markup = None
 	if buttons:
 		choice_rows = [[choice] for choice in reply.choices]
-		confirmation = len(reply.choices) == 2 and {
-			choice.lower() for choice in reply.choices
-		} <= {"yes", "no", "yes, go ahead"}
-		if confirmation or all(is_date_choice(choice) for choice in reply.choices):
-			choice_rows = [reply.choices[index : index + 2] for index in range(0, len(reply.choices), 2)]
+		# Only the short Yes/No pair fits side by side; Telegram cuts longer labels in half-width buttons.
+		if len(reply.choices) == 2 and {choice.lower() for choice in reply.choices} <= {
+			"yes",
+			"no",
+			"yes, go ahead",
+		}:
+			choice_rows = [reply.choices]
 		keyboard = []
 		number = 1
 		for row in choice_rows:
@@ -363,14 +377,7 @@ def render(reply, is_private, editing=False, prompt_token="0"):
 				]
 			)
 			number += len(row)
-		markup = {
-			"inline_keyboard": keyboard
-		}
+		markup = {"inline_keyboard": keyboard}
 	elif reply.asks and not is_private and not editing:
 		markup = {"force_reply": True}
 	return "\n".join(lines), markup
-
-
-def is_date_choice(choice):
-	first_word = choice.split(maxsplit=1)[0]
-	return first_word in {"Today", "Tomorrow", "Day", "Next", "Same", "+1", "+2", "+4"}

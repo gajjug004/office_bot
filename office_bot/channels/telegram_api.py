@@ -71,14 +71,15 @@ def edit_message_text(chat_key, message_id, text, reply_markup=None):
 	)
 
 
-def edit_message_reply_markup(chat_key, message_id):
-	"""Remove inline buttons from a prompt that has been superseded by a typed reply."""
+def edit_message_reply_markup(chat_key, message_id, picked=None):
+	"""Swap a superseded prompt's buttons for the tapped answer, or remove them after a typed reply."""
 	chat_id, _separator, _thread_id = chat_key.partition(":")
+	keyboard = [[{"text": f"✓ {picked}", "callback_data": "noop"}]] if picked else []
 	return call(
 		"editMessageReplyMarkup",
 		chat_id=chat_id,
 		message_id=message_id,
-		reply_markup={"inline_keyboard": []},
+		reply_markup={"inline_keyboard": keyboard},
 	)
 
 
