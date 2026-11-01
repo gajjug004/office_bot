@@ -6,7 +6,7 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "raven_bot",
+  "general_tab",
   "ai_section",
   "enable_ai",
   "ai_base_url",
@@ -19,23 +19,68 @@
   "default_cash_account",
   "hive_section",
   "hive_sites",
+  "raven_tab",
+  "enable_raven",
+  "raven_section",
+  "raven_bot",
+  "telegram_tab",
+  "enable_telegram",
   "telegram_section",
   "telegram_bot_token",
   "telegram_bot_username",
   "column_break_telegram",
   "connect_telegram",
   "telegram_webhook_secret",
-  "telegram_lists_section",
+  "telegram_groups_section",
   "telegram_chats",
+  "telegram_users_section",
   "telegram_users"
  ],
  "fields": [
   {
-   "description": "Add this bot to a Raven channel to take commands there and post the daily leave and WFH list",
-   "fieldname": "raven_bot",
-   "fieldtype": "Link",
-   "label": "Raven Bot",
-   "options": "Raven Bot"
+   "fieldname": "general_tab",
+   "fieldtype": "Tab Break",
+   "label": "General"
+  },
+  {
+   "fieldname": "ai_section",
+   "fieldtype": "Section Break",
+   "label": "Plain English requests"
+  },
+  {
+   "default": "0",
+   "description": "Lets employees make requests in plain English.",
+   "fieldname": "enable_ai",
+   "fieldtype": "Check",
+   "label": "Understand Plain English"
+  },
+  {
+   "default": "https://openrouter.ai/api/v1",
+   "depends_on": "enable_ai",
+   "description": "OpenAI-compatible URL.",
+   "fieldname": "ai_base_url",
+   "fieldtype": "Data",
+   "label": "API Base URL",
+   "mandatory_depends_on": "enable_ai"
+  },
+  {
+   "fieldname": "column_break_ai",
+   "fieldtype": "Column Break"
+  },
+  {
+   "depends_on": "enable_ai",
+   "description": "Must support tool calls.",
+   "fieldname": "ai_model",
+   "fieldtype": "Data",
+   "label": "Model",
+   "mandatory_depends_on": "enable_ai"
+  },
+  {
+   "depends_on": "enable_ai",
+   "fieldname": "ai_api_key",
+   "fieldtype": "Password",
+   "label": "API Key",
+   "mandatory_depends_on": "enable_ai"
   },
   {
    "fieldname": "petty_cash_section",
@@ -53,7 +98,7 @@
    "fieldtype": "Column Break"
   },
   {
-   "description": "Credited in the monthly petty cash journal entry",
+   "description": "Used in the monthly cash journal.",
    "fieldname": "default_cash_account",
    "fieldtype": "Link",
    "label": "Default Cash Account",
@@ -68,15 +113,53 @@
    "fieldname": "hive_sites",
    "fieldtype": "Table",
    "label": "Hive Sites",
-   "options": "Office Bot Hive Site"
+   "options": "Office Bot Hive Site",
+   "description": "Used by /task."
+  },
+  {
+   "fieldname": "raven_tab",
+   "fieldtype": "Tab Break",
+   "label": "Raven"
+  },
+  {
+   "default": "1",
+   "description": "Turn off to pause Raven replies and alerts.",
+   "fieldname": "enable_raven",
+   "fieldtype": "Check",
+   "label": "Enable Raven"
+  },
+  {
+   "fieldname": "raven_section",
+   "fieldtype": "Section Break",
+   "label": "Connection"
+  },
+  {
+   "description": "Handles Raven commands and daily updates.",
+   "fieldname": "raven_bot",
+   "fieldtype": "Link",
+   "label": "Raven Bot",
+   "options": "Raven Bot"
+  },
+  {
+   "fieldname": "telegram_tab",
+   "fieldtype": "Tab Break",
+   "label": "Telegram"
+  },
+  {
+   "default": "1",
+   "description": "Turn off to pause Telegram replies and alerts.",
+   "fieldname": "enable_telegram",
+   "fieldtype": "Check",
+   "label": "Enable Telegram"
   },
   {
    "fieldname": "telegram_section",
    "fieldtype": "Section Break",
-   "label": "Telegram"
+   "label": "Bot connection",
+   "description": "Connect before adding groups or users."
   },
   {
-   "description": "From @BotFather",
+   "description": "Get this token from @BotFather.",
    "fieldname": "telegram_bot_token",
    "fieldtype": "Password",
    "label": "Bot Token"
@@ -92,7 +175,7 @@
    "fieldtype": "Column Break"
   },
   {
-   "description": "Points Telegram at this site and sets the bot's command menu",
+   "description": "Set the webhook and bot command menu.",
    "fieldname": "connect_telegram",
    "fieldtype": "Button",
    "label": "Connect Telegram"
@@ -105,61 +188,28 @@
    "read_only": 1
   },
   {
-   "fieldname": "telegram_lists_section",
-   "fieldtype": "Section Break"
+   "fieldname": "telegram_groups_section",
+   "fieldtype": "Section Break",
+   "label": "Group access"
   },
   {
-   "description": "Groups where the bot takes commands and posts the daily leave and WFH list",
+   "description": "Groups that can use the bot and get daily updates.",
    "fieldname": "telegram_chats",
    "fieldtype": "Table",
    "label": "Telegram Groups",
    "options": "Office Bot Telegram Chat"
   },
   {
+   "fieldname": "telegram_users_section",
+   "fieldtype": "Section Break",
+   "label": "User access"
+  },
+  {
    "fieldname": "telegram_users",
    "fieldtype": "Table",
    "label": "Telegram Users",
-   "options": "Office Bot Telegram User"
-  },
-  {
-   "fieldname": "ai_section",
-   "fieldtype": "Section Break",
-   "label": "Plain English"
-  },
-  {
-   "default": "0",
-   "description": "People can write requests in their own words, like \"wfh tomorrow\". An AI model turns them into commands, and the bot asks before it creates anything.",
-   "fieldname": "enable_ai",
-   "fieldtype": "Check",
-   "label": "Understand Plain English"
-  },
-  {
-   "default": "https://openrouter.ai/api/v1",
-   "depends_on": "enable_ai",
-   "description": "Any OpenAI-compatible API",
-   "fieldname": "ai_base_url",
-   "fieldtype": "Data",
-   "label": "API Base URL",
-   "mandatory_depends_on": "enable_ai"
-  },
-  {
-   "fieldname": "column_break_ai",
-   "fieldtype": "Column Break"
-  },
-  {
-   "depends_on": "enable_ai",
-   "description": "Must support tool calls, like deepseek/deepseek-v4.1-flash",
-   "fieldname": "ai_model",
-   "fieldtype": "Data",
-   "label": "Model",
-   "mandatory_depends_on": "enable_ai"
-  },
-  {
-   "depends_on": "enable_ai",
-   "fieldname": "ai_api_key",
-   "fieldtype": "Password",
-   "label": "API Key",
-   "mandatory_depends_on": "enable_ai"
+   "options": "Office Bot Telegram User",
+   "description": "Link each account to an employee."
   }
  ],
  "grid_page_length": 50,

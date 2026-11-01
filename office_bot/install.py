@@ -87,9 +87,16 @@ def after_install():
 def after_migrate():
 	create_custom_fields(CUSTOM_FIELDS, ignore_validate=True)
 	ensure_bot()
+	ensure_channel_defaults()
 	ensure_message_actions()
 	ensure_categories()
 	ensure_leave_workflow()
+
+
+def ensure_channel_defaults():
+	for field in ("enable_raven", "enable_telegram"):
+		if frappe.db.get_single_value("Office Bot Settings", field) is None:
+			frappe.db.set_single_value("Office Bot Settings", field, 1)
 
 
 def ensure_bot():
@@ -105,6 +112,7 @@ def ensure_bot():
 			}
 		).insert(ignore_permissions=True)
 	frappe.db.set_single_value("Office Bot Settings", "raven_bot", BOT_NAME)
+	frappe.db.set_single_value("Office Bot Settings", "enable_raven", 1)
 
 
 def ensure_message_actions():

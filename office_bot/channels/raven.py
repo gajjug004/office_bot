@@ -1,5 +1,5 @@
 import frappe
-from frappe.utils import escape_html, get_url
+from frappe.utils import cint, escape_html, get_url
 
 from office_bot.channels.markup import to_html
 from office_bot.command import hint_sentence
@@ -11,6 +11,10 @@ CHANNEL = "Raven"
 def on_message(doc, method=None):
 	"""Raven Message after_insert. Hands bot commands to a job so sending a message never waits on the bot."""
 	if doc.is_bot_message or doc.message_type != "Text" or not doc.content:
+		return
+
+	settings = frappe.get_cached_doc("Office Bot Settings")
+	if not cint(settings.enable_raven):
 		return
 
 	bot = get_bot()
@@ -27,6 +31,9 @@ def on_message(doc, method=None):
 
 
 def handle_message(message_id: str):
+	if not cint(frappe.db.get_single_value("Office Bot Settings", "enable_raven")):
+		return
+
 	message = frappe.get_doc("Raven Message", message_id)
 	Conversation(RavenChat(get_bot(), message.channel_id, message.owner)).handle(message.content)
 

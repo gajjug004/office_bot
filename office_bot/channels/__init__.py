@@ -1,4 +1,5 @@
 import frappe
+from frappe.utils import cint
 
 from office_bot.channels import raven, telegram
 
@@ -21,8 +22,8 @@ def broadcast(reply):
 
 def enabled_channels():
 	settings = frappe.get_cached_doc("Office Bot Settings")
-	return [
-		channel
-		for channel, enabled in ((raven, settings.raven_bot), (telegram, settings.telegram_bot_username))
-		if enabled
-	]
+	enabled = (
+		(raven, cint(settings.enable_raven) and settings.raven_bot),
+		(telegram, cint(settings.enable_telegram) and settings.telegram_bot_username),
+	)
+	return [channel for channel, configured in enabled if configured]

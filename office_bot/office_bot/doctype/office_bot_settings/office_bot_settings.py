@@ -28,6 +28,8 @@ class OfficeBotSettings(Document):
 		default_cash_account: DF.Link | None
 		default_company: DF.Link | None
 		enable_ai: DF.Check
+		enable_raven: DF.Check
+		enable_telegram: DF.Check
 		hive_sites: DF.Table[OfficeBotHiveSite]
 		raven_bot: DF.Link | None
 		telegram_bot_token: DF.Password | None

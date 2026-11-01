@@ -3,7 +3,7 @@ import re
 
 import frappe
 from frappe import _
-from frappe.utils import escape_html, get_url, get_url_to_form
+from frappe.utils import cint, escape_html, get_url, get_url_to_form
 
 from office_bot.channels import telegram_api
 from office_bot.channels.markup import to_html
@@ -24,6 +24,8 @@ LEAVE_ACTION = "leave:"
 def webhook(**update):
 	"""Telegram posts every message and button tap the bot can see here."""
 	check_secret()
+	if not cint(frappe.db.get_single_value("Office Bot Settings", "enable_telegram")):
+		return
 	if callback := update.get("callback_query"):
 		receive_tap(callback)
 	elif (message := update.get("message")) and message.get("text"):
