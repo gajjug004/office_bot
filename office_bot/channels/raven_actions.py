@@ -44,7 +44,9 @@ def run_command(name, values):
 	if not context.employee:
 		frappe.throw(_("Your user is not linked to an active Employee. Ask HR to link it."))
 
-	reply = COMMANDS[name].run(values, context)
+	command = COMMANDS[name]
+	command.validate(values, context)
+	reply = command.run(values, context)
 	doctype, docname = reply.link
 	return {
 		"message": strip_html(reply.text).replace("**", ""),
