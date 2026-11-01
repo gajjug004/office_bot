@@ -28,6 +28,7 @@ class Reply:
 	link: tuple[str, str] | None = None
 	asks: bool = False
 	multiple: bool = False
+	actions: list[tuple[str, str]] = field(default_factory=list)  # (label, key) buttons that act on a record
 
 
 @dataclass

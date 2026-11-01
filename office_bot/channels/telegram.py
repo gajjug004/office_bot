@@ -11,12 +11,13 @@ from office_bot.channels.telegram_api import TelegramError
 from office_bot.command import hint_sentence
 from office_bot.commands import COMMANDS
 from office_bot.commands.help import ORDER
-from office_bot.conversation import Conversation
+from office_bot.conversation import Conversation, error_text
 
 CHANNEL = "Telegram"
 WEBHOOK_PATH = "/api/method/office_bot.channels.telegram.webhook"
 BOT_SUFFIX = re.compile(r"^(/\w+)@\w+")
 PROMPT_TIMEOUT = 60 * 60
+LEAVE_ACTION = "leave:"
 
 
 @frappe.whitelist(allow_guest=True, methods=["POST"])
@@ -84,7 +85,7 @@ def notify_user(user, reply):
 	if not telegram_id:
 		return
 	try:
-		TelegramChat(telegram_id, user).send(reply)
+		TelegramChat(telegram_id, user).notify(reply)
 	except TelegramError:
 		frappe.logger("office_bot").warning(
 			f"Could not message {user} on Telegram. They may not have started the bot."
@@ -95,7 +96,7 @@ def broadcast(reply):
 	for chat_id in frappe.get_all(
 		"Office Bot Telegram Chat", filters={"parenttype": "Office Bot Settings"}, pluck="chat_id"
 	):
-		TelegramChat(chat_id, None).send(reply)
+		TelegramChat(chat_id, None).notify(reply)
 
 
 class TelegramChat:
@@ -152,6 +153,11 @@ class TelegramChat:
 			clear_prompt(self.chat_id, self.user)
 		self.prompt_message_id = None
 
+	def notify(self, reply):
+		"""Always a new message, so a notice never replaces or ends the user's current question."""
+		text, markup = render(reply, self.is_private)
+		return telegram_api.send_message(self.chat_id, text, markup)
+
 	def send_new_message(self, text, markup):
 		return telegram_api.send_message(
 			self.chat_id,
@@ -204,6 +210,9 @@ def receive_text(message):
 def receive_tap(callback):
 	message = callback.get("message")
 	data = callback.get("data") or ""
+	if message and data.startswith(LEAVE_ACTION):
+		receive_leave_action(callback)
+		return
 	if not message or not data.startswith("pick:"):
 		telegram_api.answer_callback(callback["id"])
 		return
@@ -231,6 +240,40 @@ def receive_tap(callback):
 	)
 	tap = {"message_id": message["message_id"], "token": token, "label": label}
 	enqueue_as(user, chat_key=chat_key, text=number, tap=tap)
+
+
+def receive_leave_action(callback):
+	user = find_user(callback["from"])
+	if not user:
+		telegram_api.answer_callback(callback["id"], unknown_user_text(callback["from"], html=False))
+		return
+	telegram_api.answer_callback(callback["id"])
+	message = callback["message"]
+	# The job runs as the approver, so HRMS and the workflow check that they may decide this leave.
+	frappe.set_user(user)
+	frappe.enqueue(
+		"office_bot.channels.telegram.decide_leave",
+		chat_key=get_chat_key(message),
+		message_id=message["message_id"],
+		data=callback["data"],
+	)
+
+
+def decide_leave(chat_key: str, message_id: int, data: str):
+	# notifications imports the channels, so import it here to avoid a cycle.
+	from office_bot import notifications
+
+	_prefix, action, leave = data.split(":", 2)
+	try:
+		reply = notifications.decide_leave(leave, action)
+	except (frappe.ValidationError, frappe.PermissionError) as error:
+		frappe.db.rollback()
+		telegram_api.send_message(
+			chat_key, escape_html(_("Could not do that: {0}").format(error_text(error)))
+		)
+		return
+	text, _markup = render(reply, not chat_key.startswith("-"))
+	telegram_api.edit_message_text(chat_key, message_id, text)
 
 
 def enqueue_as(user, **kwargs):
@@ -378,6 +421,10 @@ def render(reply, is_private, editing=False, prompt_token="0"):
 			)
 			number += len(row)
 		markup = {"inline_keyboard": keyboard}
+	elif reply.actions:
+		markup = {
+			"inline_keyboard": [[{"text": label, "callback_data": key} for label, key in reply.actions]]
+		}
 	elif reply.asks and not is_private and not editing:
 		markup = {"force_reply": True}
 	return "\n".join(lines), markup

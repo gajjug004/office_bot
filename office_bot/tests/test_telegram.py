@@ -194,3 +194,30 @@ class TestTelegram(IntegrationTestCase):
 			self.sent("editMessageReplyMarkup")[-1]["reply_markup"],
 			{"inline_keyboard": [[{"text": "✓ Same day (Mon 9 Nov)", "callback_data": "noop"}]]},
 		)
+
+	def test_leave_buttons_tap_decides_as_the_sender(self):
+		_text, markup = telegram.render(
+			Reply("Leave", actions=[("Approve", "leave:Approve:L1"), ("Reject", "leave:Reject:L1")]),
+			is_private=True,
+		)
+		self.assertEqual(
+			markup["inline_keyboard"],
+			[
+				[
+					{"text": "Approve", "callback_data": "leave:Approve:L1"},
+					{"text": "Reject", "callback_data": "leave:Reject:L1"},
+				]
+			],
+		)
+
+		message = {"message_id": 9, "chat": {"id": ME["id"], "type": "private"}}
+		callback = {"id": "cb1", "from": ME, "message": message, "data": "leave:Approve:L1"}
+		with (
+			patch("office_bot.channels.telegram.frappe.get_request_header", return_value=SECRET),
+			patch("office_bot.channels.telegram.frappe.enqueue") as enqueue,
+		):
+			telegram.webhook(update_id=3, callback_query=callback)
+		self.assertEqual(frappe.session.user, "Administrator")
+		self.assertEqual(
+			enqueue.call_args.kwargs, {"chat_key": str(ME["id"]), "message_id": 9, "data": "leave:Approve:L1"}
+		)

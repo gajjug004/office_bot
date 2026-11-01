@@ -1,9 +1,12 @@
 import frappe
 from frappe import _
-from frappe.utils import flt, today
+from frappe.utils import flt, get_fullname, today
 
 from office_bot import channels
-from office_bot.command import Reply, count_days, date_range
+from office_bot.command import Reply, count_days, date_range, show_date
+
+APPROVE = "Approve"
+REJECT = "Reject"
 
 
 def on_leave_applied(doc, method=None):
@@ -19,14 +22,58 @@ def on_leave_change(doc, method=None):
 def notify_approver(leave: str):
 	doc = frappe.get_doc("Leave Application", leave)
 	lines = [
-		_("**{0}** applied for {1}").format(doc.employee_name, doc.leave_type),
-		f"{date_range(doc.from_date, doc.to_date)}, {count_days(doc.total_leave_days)}",
+		_("**Leave request**"),
+		_("**Employee:** {0}").format(doc.employee_name),
+		_("**Type:** {0}").format(doc.leave_type),
+		_("**From:** {0}").format(show_date(doc.from_date)),
+		_("**To:** {0}").format(show_date(doc.to_date)),
+		_("**Duration:** {0}").format(count_days(doc.total_leave_days)),
 	]
 	if doc.description:
-		lines.append(_("Reason: {0}").format(doc.description))
+		lines.append(_("**Reason:** {0}").format(doc.description))
+	actions = [
+		(_("Approve"), f"leave:{APPROVE}:{doc.name}"),
+		(_("Reject"), f"leave:{REJECT}:{doc.name}"),
+	]
+	channels.notify_user(
+		doc.leave_approver, Reply("\n".join(lines), link=(doc.doctype, doc.name), actions=actions)
+	)
+
+
+def decide_leave(leave: str, action: str):
+	"""Approve or reject as the session user. The workflow and HRMS decide whether they may."""
+	if action not in (APPROVE, REJECT):
+		frappe.throw(_("Unknown action."))
+	doc = frappe.get_doc("Leave Application", leave)
+	if doc.docstatus != 0 or doc.status != "Open":
+		return leave_decided_reply(doc, _("**Leave already {0}**").format(_(doc.status).lower()))
+
+	if frappe.session.user != doc.leave_approver and "HR Manager" not in frappe.get_roles():
+		frappe.throw(
+			_("Only {0} can decide this leave.").format(get_fullname(doc.leave_approver)),
+			frappe.PermissionError,
+		)
+
 	if frappe.get_all("Workflow", filters={"document_type": doc.doctype, "is_active": 1}, limit=1):
-		lines.append(_("Open it to approve or reject. In Raven, use the workflow menu on the card."))
-	channels.notify_user(doc.leave_approver, Reply("\n".join(lines), link=(doc.doctype, doc.name)))
+		from frappe.model.workflow import apply_workflow
+
+		doc = apply_workflow(doc, action)
+	else:
+		doc.status = "Approved" if action == APPROVE else "Rejected"
+		doc.submit()
+	return leave_decided_reply(
+		doc, _("**Leave {0}** by {1}").format(_(doc.status).lower(), get_fullname(frappe.session.user))
+	)
+
+
+def leave_decided_reply(doc, title):
+	lines = [
+		title,
+		_("**Employee:** {0}").format(doc.employee_name),
+		_("**Type:** {0}").format(doc.leave_type),
+		_("**Dates:** {0}").format(date_range(doc.from_date, doc.to_date)),
+	]
+	return Reply("\n".join(lines), link=(doc.doctype, doc.name))
 
 
 def notify_employee(leave: str):
