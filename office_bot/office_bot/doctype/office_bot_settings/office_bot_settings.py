@@ -24,7 +24,10 @@ class OfficeBotSettings(Document):
 
 		ai_api_key: DF.Password | None
 		ai_base_url: DF.Data | None
-		ai_model: DF.Data | None
+		ai_model: DF.Autocomplete | None
+		ai_provider: DF.Literal[
+			"OpenRouter", "OpenAI", "Anthropic", "Google Gemini", "Custom OpenAI-compatible"
+		] | None
 		default_cash_account: DF.Link | None
 		default_company: DF.Link | None
 		enable_ai: DF.Check
