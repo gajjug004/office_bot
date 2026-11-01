@@ -1,8 +1,10 @@
 import frappe
+from erpnext.setup.doctype.employee.employee import is_holiday
 from frappe import _
+from frappe.utils import add_days, date_diff
 
 from office_bot.command import Command, Reply, count_days, date_range, show_date
-from office_bot.commands.time_off import from_date_field, parse_time_off, to_date_field, total_days
+from office_bot.commands.time_off import from_date_field, parse_time_off, to_date_field
 
 
 class WorkFromHome(Command):
@@ -22,6 +24,11 @@ class WorkFromHome(Command):
 	def validate(self, values, context):
 		check_no_leave(context.employee, values["from_date"], values["to_date"])
 		check_no_attendance_request(context.employee, values["from_date"], values["to_date"])
+		check_no_marked_attendance(context.employee, values["from_date"], values["to_date"])
+		if not wfh_days(values, context.employee):
+			frappe.throw(
+				_("{0} is a holiday for you.").format(date_range(values["from_date"], values["to_date"]))
+			)
 
 	def progress(self, values, context):
 		if not values.get("from_date"):
@@ -29,7 +36,7 @@ class WorkFromHome(Command):
 		return _("**Work from home**\n**From:** {0}").format(show_date(values["from_date"]))
 
 	def run(self, values, context):
-		days = total_days(values)
+		days = wfh_days(values, context.employee)
 		# Store the WFH days in a custom field, not Half Day: Half Day would mark
 		# the attendance half present, half absent.
 		request = frappe.get_doc(
@@ -58,10 +65,20 @@ class WorkFromHome(Command):
 			(
 				_("**From:** {0}").format(show_date(values["from_date"])),
 				_("**To:** {0}").format(show_date(values["to_date"])),
-				_("**Duration:** {0}").format(count_days(total_days(values))),
+				_("**Duration:** {0}").format(count_days(wfh_days(values, context.employee))),
 				_("**Type:** {0}").format(_("Half day") if values.get("half_day") else _("Full day")),
 			)
 		)
+
+
+def wfh_days(values, employee):
+	"""The days HRMS will mark. It skips holidays, as the bot never sets Include Holidays."""
+	from_date, to_date = values["from_date"], values["to_date"]
+	days = sum(
+		not is_holiday(employee, add_days(from_date, offset))
+		for offset in range(date_diff(to_date, from_date) + 1)
+	)
+	return days - 0.5 if days and values.get("half_day") else days
 
 
 def check_no_leave(employee, from_date, to_date):
@@ -84,9 +101,9 @@ def check_no_leave(employee, from_date, to_date):
 	dates = date_range(leave.from_date, leave.to_date)
 	if leave.status == "Approved":
 		frappe.throw(
-			_("You are on approved {0} on {1}. Ask HR to cancel it before applying for work from home.").format(
-				leave.leave_type, dates
-			)
+			_(
+				"You are on approved {0} on {1}. Ask HR to cancel it before applying for work from home."
+			).format(leave.leave_type, dates)
 		)
 	frappe.throw(
 		_("You have a pending {0} on {1}. Withdraw it with /cancel first.").format(leave.leave_type, dates)
@@ -109,5 +126,26 @@ def check_no_attendance_request(employee, from_date, to_date):
 		frappe.throw(
 			_("You already have a {0} request on {1}.").format(
 				_(request.reason), date_range(request.from_date, request.to_date)
+			)
+		)
+
+
+def check_no_marked_attendance(employee, from_date, to_date):
+	"""HRMS overwrites marked attendance in place, so withdrawing the WFH later would cancel the original record."""
+	attendance = frappe.db.get_value(
+		"Attendance",
+		{
+			"employee": employee,
+			"docstatus": ["<", 2],
+			"attendance_date": ["between", [from_date, to_date]],
+		},
+		["attendance_date", "status"],
+		as_dict=True,
+		order_by="attendance_date asc",
+	)
+	if attendance:
+		frappe.throw(
+			_("Your attendance on {0} is already marked as {1}. Ask HR to change it.").format(
+				show_date(attendance.attendance_date), _(attendance.status)
 			)
 		)

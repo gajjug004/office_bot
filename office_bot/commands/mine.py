@@ -2,7 +2,7 @@ import frappe
 from frappe import _
 from frappe.utils import flt
 
-from office_bot.command import Choice, Command, Field, Reply, date_range, show_date
+from office_bot.command import Choice, Command, Field, Reply, date_range
 from office_bot.commands.leave import get_leave_balances
 
 
@@ -61,14 +61,18 @@ class CancelRequest(Command):
 		doc = frappe.get_doc(doctype, name)
 		if doc.employee != context.employee:
 			frappe.throw(_("You can only withdraw your own requests."), frappe.PermissionError)
+		request = self.describe(values, context)
 
 		# Employees may not cancel or delete these doctypes; withdrawing your own upcoming request is allowed by policy.
 		if doctype == "Attendance Request":
+			cancel_attendance(doc)
 			doc.flags.ignore_permissions = True
 			doc.cancel()
 		else:
 			doc.delete(ignore_permissions=True)
-		return Reply(_("**Withdrawn** {0} {1}").format(_(doctype), show_date(doc.from_date)))
+		return Reply(
+			_("**Request withdrawn**\n**Employee:** {0}\n**Request:** {1}").format(doc.employee_name, request)
+		)
 
 	def describe(self, values, context):
 		name = values["request"][1]
@@ -110,3 +114,13 @@ def get_upcoming_requests(context):
 		for row in leaves
 	]
 	return sorted(requests, key=lambda request: request.from_date)
+
+
+def cancel_attendance(request):
+	"""HRMS cancels a request's Attendance as the employee, who may not cancel Attendance, so do it first."""
+	for name in frappe.get_all(
+		"Attendance", filters={"attendance_request": request.name, "docstatus": 1}, pluck="name"
+	):
+		attendance = frappe.get_doc("Attendance", name)
+		attendance.flags.ignore_permissions = True
+		attendance.cancel()
