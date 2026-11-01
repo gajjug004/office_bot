@@ -91,3 +91,14 @@ def answer_callback(callback_query_id, text=None):
 		call("answerCallbackQuery", callback_query_id=callback_query_id, **alert)
 	except TelegramError as error:
 		frappe.logger("office_bot").warning(str(error))
+
+
+def react_to_message(chat_key, message_id, emoji="👍"):
+	"""Add a bot reaction to a message, including in a forum topic."""
+	chat_id, _separator, _thread_id = chat_key.partition(":")
+	return call(
+		"setMessageReaction",
+		chat_id=chat_id,
+		message_id=message_id,
+		reaction=[{"type": "emoji", "emoji": emoji}],
+	)

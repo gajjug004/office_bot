@@ -201,6 +201,11 @@ def receive_text(message):
 		)
 	):
 		return
+	if is_command:
+		try:
+			telegram_api.react_to_message(get_chat_key(message), message["message_id"])
+		except TelegramError as error:
+			frappe.logger("office_bot").warning(f"Could not react to Telegram command: {error}")
 	enqueue_as(
 		user,
 		chat_key=get_chat_key(message),
